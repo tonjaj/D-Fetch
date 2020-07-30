@@ -1,0 +1,140 @@
+
+
+data = readtable('Average exercise hours per equipment per type all clubs peak three months.csv');
+
+results = cell(1,4);
+results = cell2table(results);
+results.Properties.VariableNames = {'Club', 'AssetType', 'RecommendedNumber', 'PopularityIndex'};
+res_index = 1;
+
+clubs = unique(data.ClubName);
+
+club_avg = cell(size(clubs,1),2);
+club_avg = cell2table(club_avg);
+club_avg.Properties.VariableNames = {'Club', 'MeanExerciseHours'};
+
+exercise_hrs_data = readtable('Total Exercise Hours per club (not by cat or type).csv');
+club_exercise_hrs_avg = cell(size(clubs,1),3);
+club_exercise_hrs_avg = cell2table(club_exercise_hrs_avg);
+club_exercise_hrs_avg.Properties.VariableNames = {'Club', 'MeanTotalExerciseHours', 'ClubLoadWeighting'};
+
+for i = 1:size(clubs,1)
+   club = clubs{i};
+   club_data = data(ismember(data.ClubName, club),:);
+   
+   tot_asset_exercise_hours = sum(club_data.ExerciseHoursPerEquipment);
+   mean_asset_exercise_hours = tot_asset_exercise_hours / length(club_data.ExerciseHoursPerEquipment);
+   
+   club_avg.Club{i} = club;
+   club_avg.MeanExerciseHours{i} = mean_asset_exercise_hours;
+   
+   
+   club_exercise_data = exercise_hrs_data(ismember(exercise_hrs_data.ClubName, club),:);
+   tot_club_exercise_hours = sum(club_exercise_data.ExerciseHours);
+   mean_club_exercise_hours = tot_club_exercise_hours / length(club_exercise_data.ExerciseHours)
+   
+   club_exercise_hrs_avg.Club{i} = club;
+   club_exercise_hrs_avg.MeanTotalExerciseHours{i} = mean_club_exercise_hours;
+   if (i == 1)
+       club_exercise_hrs_avg.ClubLoadWeighting{i} = 1;
+   else
+       club_exercise_hrs_avg.ClubLoadWeighting{i} = mean_club_exercise_hours / club_exercise_hrs_avg.MeanTotalExerciseHours{1};
+   end
+   
+end
+
+assets = unique(data.AssetType);
+
+for i = 1:size(assets,1)
+   
+    asset = assets{i};
+    asset_data = data(ismember(data.AssetType, asset),:);
+    
+    if (size(asset_data,1) < size(clubs,1)) % asset not in all clubs
+        popular_asset_count = 0;
+        popularity = 0;
+        sum_num_assets = 0;
+        sum_club_load = 0;
+        for j = 1:size(asset_data,1)
+            
+            current_club = asset_data.ClubName(j);
+            current_exercise_hours = asset_data.ExerciseHoursPerEquipment(j);
+            current_club_avg = club_avg.MeanExerciseHours{find(ismember(club_avg.Club, current_club))};
+            
+            current_asset_number = asset_data.cntAssets(j);
+%             sum_num_assets = sum_num_assets + current_asset_number;
+            
+            if (current_exercise_hours > current_club_avg)
+                popular_asset_count = popular_asset_count + 1;
+                sum_num_assets = sum_num_assets + current_asset_number;
+                sum_club_load = sum_club_load + club_exercise_hrs_avg.MeanTotalExerciseHours{(find(ismember(club_exercise_hrs_avg.Club, current_club)))};
+                popularity = popularity + (current_exercise_hours - current_club_avg);
+            end
+            
+        end
+        
+        popularity_percentage = popular_asset_count / size(asset_data,1);
+%         avg_num_assets = sum_num_assets / size(asset_data,1);
+        avg_num_assets = sum_num_assets / popular_asset_count;
+        avg_club_load = sum_club_load / popular_asset_count;
+        
+        popularity_index = popularity / size(asset_data,1);
+
+
+%         popularity_index = 0;
+%         if (popularity ~= 0)
+%             popularity_index = popularity / size(asset_data,1);
+%         end
+        
+
+        if (popularity_percentage > 0.5)
+           
+            for k = 1:size(clubs,1)
+               if (~ismember(asset_data.ClubName, clubs{k}))
+                   club_without_asset = clubs(k);
+                   weight = club_exercise_hrs_avg.MeanTotalExerciseHours{find(ismember(club_exercise_hrs_avg.Club, club_without_asset))} / avg_club_load;
+                   
+                   results.Club{res_index} = clubs{k};
+%                    results.AvgDifference{res_index} = popularity_index;
+                   results.AssetType{res_index} = asset;
+                   num_additional_assets = ceil(weight * avg_num_assets);
+                   results.RecommendedNumber{res_index} = ceil(num_additional_assets);
+                   results.PopularityIndex{res_index} = popularity_index;
+                   res_index = res_index + 1;
+               end
+            end
+            
+        end
+    end
+    
+    
+end
+
+
+results = sortrows(results, 'PopularityIndex', 'descend');
+
+results_bislett = results(ismember(results.Club, 'Bislett'),:)
+results_nydalen = results(ismember(results.Club, 'Nydalen'),:)
+results_ringnes_park = results(ismember(results.Club, 'Ringnes Park'),:)
+results_schous_plass = results(ismember(results.Club, 'Schous Plass'),:)
+results_fagerborg = results(ismember(results.Club, 'Fagerborg'),:)
+
+filename = 'add_new_asset_overall.csv';    %must end in csv
+writetable( results, filename, 'writevariablenames', true, 'quotestrings', true);
+
+filename = 'add_new_asset_bislett.csv';    %must end in csv
+writetable( results, filename, 'writevariablenames', true, 'quotestrings', true);
+
+filename = 'add_new_asset_nyd.csv';    %must end in csv
+writetable( results, filename, 'writevariablenames', true, 'quotestrings', true);
+
+filename = 'add_asset_not_in_club.csv';    %must end in csv
+writetable( results, filename, 'writevariablenames', true, 'quotestrings', true);
+
+filename = 'add_asset_not_in_club.csv';    %must end in csv
+writetable( results, filename, 'writevariablenames', true, 'quotestrings', true);
+
+filename = 'add_asset_not_in_club.csv';    %must end in csv
+writetable( results, filename, 'writevariablenames', true, 'quotestrings', true);
+
+
